@@ -1,0 +1,281 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Generator - Craft Your Novel</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div id="home-section" class="section active">
+        <header class="hero">
+            <h1>Welcome to Book Generator</h1>
+            <p class="tagline">Turn your ideas into a novel! Create characters, design your story, and generate a book in minutes.</p>
+            <div class="cta-buttons">
+                <button class="button primary" onclick="showSection('character-section')">Create Your First Character</button>
+                <button class="button secondary" onclick="showSection('book-section')">Design Your Book</button>
+            </div>
+        </header>
+        <div class="container">
+            <nav class="main-nav">
+                <button class="nav-button" onclick="showSection('character-section')">Add Character</button>
+                <button class="nav-button" onclick="showSection('book-section')">Set Book Details</button>
+                <button class="nav-button" onclick="showSection('characters-section'); fetchCharacters()">View Characters</button>
+                <button class="nav-button" onclick="submitAction('/generate_plot')">Generate Plot</button>
+                <button class="nav-button" onclick="submitAction('/preview_structure')">Preview Book Structure</button>
+                <button class="nav-button" onclick="submitAction('/generate_book', 'display-section')">Generate Full Book</button>
+            </nav>
+            <section class="instructions">
+                <h2>Get Started</h2>
+                <p>Build your book in these easy steps:</p>
+                <ul>
+                    <li><strong>Create Characters</strong>: Add at least 2 characters with details like name, age, and relationships.</li>
+                    <li><strong>Design Your Book</strong>: Set the genre, setting, tone, themes, and other details.</li>
+                    <li><strong>View Characters</strong>: Review all characters you've created.</li>
+                    <li><strong>Generate a Plot</strong>: Create a story outline based on your characters and settings.</li>
+                    <li><strong>Preview the Structure</strong>: Review a summary of your book’s chapters (optional).</li>
+                    <li><strong>Generate the Book</strong>: Produce a complete novel (100–400 pages, 10–100 chapters), view it on-screen, and download it as a Markdown file.</li>
+                </ul>
+            </section>
+            <section class="output-section">
+                <h2>Output</h2>
+                <div id="output" class="output">
+                    <p>Ready to create your novel? Start by adding a character or setting book details above.</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <div id="character-section" class="section">
+        <div class="container">
+            <h1>Add Character</h1>
+            <p>Fill in the character details. Only Name and Age are required.</p>
+            <button class="button" onclick="showSection('home-section')">Back to Home</button>
+            <form id="character-form" onsubmit="submitForm(event, '/add_character', 'home-section')">
+                <label>Name: <input type="text" name="name" required></label>
+                <label>Age: <input type="number" name="age" min="0" value="0" required></label>
+                <label>Gender: <input type="text" name="gender" placeholder="Not specified"></label>
+                <label>Occupation: <input type="text" name="occupation" placeholder="Not specified"></label>
+                <label>Personality: <input type="text" name="personality" placeholder="Not specified"></label>
+                <label>Backstory: <input type="text" name="backstory" placeholder="Not specified"></label>
+                <label>Physical Traits: <input type="text" name="physical_traits" placeholder="Not specified"></label>
+                <label>Motivations: <input type="text" name="motivations" placeholder="Not specified"></label>
+                <label>Relationships (e.g., John: Friend, Jane: Enemy): <input type="text" name="relationships"></label>
+                <button type="submit">Add Character</button>
+            </form>
+            <div class="output" id="character-output"></div>
+        </div>
+    </div>
+
+    <div id="book-section" class="section">
+        <div class="container">
+            <h1>Book Maker</h1>
+            <p>Create characters and set book details to design your novel.</p>
+            <button class="button" onclick="showSection('home-section')">Back to Home</button>
+
+            <section>
+                <h2>Add Character</h2>
+                <p>Only Name and Age are required.</p>
+                <form id="book-character-form" onsubmit="submitForm(event, '/add_character', 'home-section')">
+                    <label>Name: <input type="text" name="name" required></label>
+                    <label>Age: <input type="number" name="age" min="0" value="0" required></label>
+                    <label>Gender: <input type="text" name="gender" placeholder="Not specified"></label>
+                    <label>Occupation: <input type="text" name="occupation" placeholder="Not specified"></label>
+                    <label>Personality: <input type="text" name="personality" placeholder="Not specified"></label>
+                    <label>Backstory: <input type="text" name="backstory" placeholder="Not specified"></label>
+                    <label>Physical Traits: <input type="text" name="physical_traits" placeholder="Not specified"></label>
+                    <label>Motivations: <input type="text" name="motivations" placeholder="Not specified"></label>
+                    <label>Relationships (e.g., John: Friend, Jane: Enemy): <input type="text" name="relationships"></label>
+                    <button type="submit">Add Character</button>
+                </form>
+            </section>
+
+            <section>
+                <h2>Set Book Details</h2>
+                <p>All fields except Key Plot Points are required.</p>
+                <form id="details-form" onsubmit="submitForm(event, '/set_details', 'home-section')">
+                    <label>Genre: <input type="text" name="genre" required></label>
+                    <label>Setting: <input type="text" name="setting" required></label>
+                    <label>Tone: <input type="text" name="tone" required></label>
+                    <label>Themes (comma-separated): <input type="text" name="themes" required></label>
+                    <label>Page Count (100-400): <input type="number" name="page_count" min="100" max="400" value="100" required></label>
+                    <label>Chapter Count (10-100): <input type="number" name="chapter_count" min="10" max="100" value="10" required></label>
+                    <label>Conflict Intensity:
+                        <select name="conflict_intensity" required>
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </label>
+                    <label>Title: <input type="text" name="title" required></label>
+                    <label>Key Plot Points (comma-separated): <input type="text" name="key_plot_points"></label>
+                    <button type="submit">Set Details</button>
+                </form>
+            </section>
+            <div class="output" id="book-output"></div>
+        </div>
+    </div>
+
+    <div id="characters-section" class="section">
+        <div class="container">
+            <h1>All Characters</h1>
+            <p>View all characters you have created.</p>
+            <button class="button" onclick="showSection('home-section')">Back to Home</button>
+            <div id="characters-list" class="output"></div>
+        </div>
+    </div>
+
+    <div id="display-section" class="section">
+        <div class="container">
+            <h1>Generated Book</h1>
+            <p>Your book is displayed below. You can download it as a Markdown file.</p>
+            <button class="button" onclick="showSection('home-section')">Back to Home</button>
+            <a href="/download_book" class="button" id="download-button">Download Book</a>
+            <div id="book-content" class="book-content"></div>
+        </div>
+    </div>
+
+    <script>
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(sectionId).classList.add('active');
+            if (sectionId !== 'display-section') {
+                document.getElementById('book-content').innerHTML = '';
+            }
+            if (sectionId !== 'characters-section') {
+                document.getElementById('characters-list').innerHTML = '';
+            }
+            if (sectionId === 'home-section') {
+                document.getElementById('character-output').innerHTML = '';
+                document.getElementById('book-output').innerHTML = '';
+            }
+        }
+
+        async function submitForm(event, url, nextSection) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+
+            // Client-side validation
+            if (url === '/add_character') {
+                if (!data.name.trim()) {
+                    showError('character-output', 'Name is required.');
+                    return;
+                }
+                if (isNaN(data.age) || data.age < 0) {
+                    showError('character-output', 'Age must be a non-negative number.');
+                    return;
+                }
+            } else if (url === '/set_details') {
+                if (!data.genre.trim() || !data.setting.trim() || !data.tone.trim() || !data.themes.trim() || !data.title.trim()) {
+                    showError('book-output', 'Genre, Setting, Tone, Themes, and Title are required.');
+                    return;
+                }
+                if (data.page_count < 100 || data.page_count > 400) {
+                    showError('book-output', 'Page Count must be between 100 and 400.');
+                    return;
+                }
+                if (data.chapter_count < 10 || data.chapter_count > 100) {
+                    showError('book-output', 'Chapter Count must be between 10 and 100.');
+                    return;
+                }
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                const outputDiv = document.getElementById('output');
+                outputDiv.innerHTML = `<div class="flash ${result.success ? 'success' : 'error'}">${result.message}</div>`;
+                if (result.success) {
+                    showSection(nextSection);
+                    form.reset();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('output').innerHTML = `<div class="flash error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function submitAction(url, nextSection = 'home-section') {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                const result = await response.json();
+                const outputDiv = nextSection === 'display-section' ? document.getElementById('book-content') : document.getElementById('output');
+                outputDiv.innerHTML = `<div class="flash ${result.success ? 'success' : 'error'}">${result.message}</div>`;
+                if (result.success && nextSection) {
+                    showSection(nextSection);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('output').innerHTML = `<div class="flash error">Error: ${error.message}</div>`;
+            }
+        }
+
+        async function fetchCharacters() {
+            try {
+                const response = await fetch('/get_characters');
+                const result = await response.json();
+                const charactersDiv = document.getElementById('characters-list');
+                charactersDiv.innerHTML = `<div class="flash ${result.success ? 'success' : 'error'}">${result.message}</div>`;
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('characters-list').innerHTML = `<div class="flash error">Error: ${error.message}</div>`;
+            }
+        }
+
+        function showError(outputId, message) {
+            document.getElementById(outputId).innerHTML = `<div class="flash error">${message}</div>`;
+        }
+    </script>
+</body>
+</html>
